@@ -1,0 +1,10 @@
+{
+  "name": "laboratorio-faraday",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Dashboard de laboratorio de la ley de Faraday con ESP32 y WebSocket",
+  "dependencies": {
+    "express": "^5.1.0",
+    "ws": "^8.18.3"
+  }
+}
