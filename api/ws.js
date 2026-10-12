@@ -1,38 +1,83 @@
-import express from 'express';
-import { createServer } from 'http';
+import http from 'node:http';
 import { WebSocketServer, WebSocket } from 'ws';
 
-const app = express();
-const server = createServer(app);
+const PORT = process.env.PORT || 3000;
 
-const wss = new WebSocketServer({ server });
+const server = http.createServer((req, res) => {
+  if (req.url === '/health') {
+    res.writeHead(200, {
+      'Content-Type': 'application/json'
+    });
 
-wss.on('connection', (socket) => {
-  console.log('Nueva conexion WebSocket');
+    res.end(JSON.stringify({
+      status: 'ok',
+      websocket: '/ws',
+      clientes: wss.clients.size
+    }));
 
-  socket.on('message', (data) => {
-    // Reenviar datos a los otros clientes conectados
+    return;
+  }
+
+  res.writeHead(200, {
+    'Content-Type': 'text/plain; charset=utf-8'
+  });
+
+  res.end('Laboratorio de Faraday activo');
+});
+
+const wss = new WebSocketServer({
+  server,
+  path: '/ws'
+});
+
+let totalMensajes = 0;
+
+wss.on('connection', (socket, request) => {
+  const ip = request.socket.remoteAddress;
+
+  console.log('[WS] Cliente conectado:', ip);
+  console.log('[WS] Clientes activos:', wss.clients.size);
+
+  socket.on('message', (data, isBinary) => {
+    totalMensajes++;
+
+    const mensaje = data.toString();
+
+    console.log(
+      `[WS] Mensaje #${totalMensajes}: ${mensaje}`
+    );
+
+    let reenviados = 0;
+
     for (const client of wss.clients) {
       if (
         client !== socket &&
         client.readyState === WebSocket.OPEN
       ) {
-        client.send(data.toString());
+        client.send(data, { binary: isBinary });
+        reenviados++;
       }
     }
+
+    console.log(
+      `[WS] Mensaje recibido. Clientes destinatarios: ${reenviados}`
+    );
+  });
+
+  socket.on('close', (code, reason) => {
+    console.log(
+      '[WS] Cliente desconectado:',
+      code,
+      reason.toString()
+    );
   });
 
   socket.on('error', (error) => {
-    console.error('Error WebSocket:', error.message);
-  });
-
-  socket.on('close', () => {
-    console.log('Conexion cerrada');
+    console.error('[WS] Error:', error.message);
   });
 });
 
-app.get('/', (req, res) => {
-  res.status(200).send('Servidor WebSocket del laboratorio activo');
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`[HTTP] Servidor escuchando en puerto ${PORT}`);
+  console.log('[WS] Ruta WebSocket: /ws');
 });
-
-export default server;
